@@ -3,7 +3,7 @@ go
 
 
 -----Consulta 1---------------------------------------------------------
---Top 5 entidades con más casos confirmados por cada año.
+--Top 5 entidades con mÃ¡s casos confirmados por cada aÃ±o.
 
 WITH casos_por_entidad AS (
     SELECT 
@@ -27,7 +27,7 @@ WHERE ranking <= 5
 ORDER BY anio, ranking;
 
 ------Consulta 2---------------------------------------------------------
---Municipio con más casos confirmados recuperados por estado y por año.
+--Municipio con mÃ¡s casos confirmados recuperados por estado y por aÃ±o.
 
 SELECT 
     YEAR(FECHA_INGRESO) AS anio,
@@ -49,7 +49,7 @@ HAVING COUNT(*) = (
 ORDER BY anio, ENTIDAD_NAC;
 
 --------Consulta 3--------------------------------------------------------
---Porcentaje de casos confirmados de diabetes, obesidad e hipertensión.
+--Porcentaje de casos confirmados de diabetes, obesidad e hipertensiÃ³n.
 
 SELECT
     'Diabetes' AS morbilidad,
@@ -62,32 +62,60 @@ SELECT
 FROM dbo.datoscovid
 UNION ALL
 SELECT
-    'Hipertensión' AS morbilidad,
+    'HipertensiÃ³n' AS morbilidad,
     (COUNT(CASE WHEN HIPERTENSION = 1 AND CLASIFICACION_FINAL = 3 THEN 1 END) * 100.0) / COUNT(CASE WHEN CLASIFICACION_FINAL = 3 THEN 1 END) AS porcentaje
 FROM dbo.datoscovid;
 
 -------Consulta 4---------------------------------------------------
---Municipios que no tengan casos confirmados de hipertensión, obesidad, diabetes y tabaquismo.
+--Municipios que no tengan casos confirmados de hipertensiÃ³n, obesidad, diabetes y tabaquismo.
+
+SELECT DISTINCT MUNICIPIO_RES INTO #temporal_municipios
+FROM (
+    SELECT MUNICIPIO_RES 
+    FROM [YUVIA\ABIGAIL].[covidHistorico].[dbo].[datoscovid_norte]
+    WHERE CLASIFICACION_FINAL = 3 AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
+    UNION
+    SELECT MUNICIPIO_RES 
+    FROM [PC-MONZEE\SQLEXPRESS03].[covidHistorico].[dbo].[datoscovid_centro_norte]
+    WHERE CLASIFICACION_FINAL = 3 AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
+    UNION    
+    SELECT MUNICIPIO_RES 
+    FROM covidHistorico.dbo.[datoscovid_centro_sur]
+    WHERE CLASIFICACION_FINAL = 3 AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)    
+    UNION    
+    SELECT MUNICIPIO_RES 
+    FROM OPENQUERY([MYSQLYUVIA], '
+        SELECT MUNICIPIO_RES 
+        FROM datoscovid 
+        WHERE CLASIFICACION_FINAL = 3
+        AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
+    ')
+) AS datos;
 
 SELECT DISTINCT MUNICIPIO_RES
-FROM dbo.datoscovid
-WHERE MUNICIPIO_RES NOT IN (
-    SELECT DISTINCT MUNICIPIO_RES
-    FROM dbo.datoscovid
-    WHERE CLASIFICACION_FINAL = 3  -- Casos confirmados
-    AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
-)
+FROM (
+    SELECT MUNICIPIO_RES FROM [YUVIA\ABIGAIL].[covidHistorico].[dbo].[datoscovid_norte]
+    UNION
+    SELECT MUNICIPIO_RES FROM [PC-MONZEE\SQLEXPRESS03].[covidHistorico].[dbo].[datoscovid_centro_norte]
+    UNION
+    SELECT MUNICIPIO_RES FROM covidHistorico.dbo.[datoscovid_centro_sur]
+    UNION
+    SELECT MUNICIPIO_RES FROM OPENQUERY([MYSQLYUVIA], 'SELECT MUNICIPIO_RES FROM datoscovid')
+) AS todos_municipios
+WHERE MUNICIPIO_RES NOT IN (SELECT MUNICIPIO_RES FROM #temporal_municipios)
 ORDER BY MUNICIPIO_RES;
 
+DROP TABLE #temporal_municipios;
+
 -------Consulta 5-----------------------------------------------------
---Estados con más casos recuperados con neumonía.
+--Estados con mÃ¡s casos recuperados con neumonÃ­a.
 
 SELECT 
     ENTIDAD_NAC AS estado,
     COUNT(*) AS total_recuperados_con_neumonia
 FROM dbo.datoscovid
 WHERE CLASIFICACION_FINAL = 3  -- Casos confirmados
-AND NEUMONIA = 1              -- Pacientes con neumonía
+AND NEUMONIA = 1              -- Pacientes con neumonÃ­a
 AND FECHA_DEF IS NULL         -- Filtramos solo los recuperados (no fallecidos)
 GROUP BY ENTIDAD_NAC
 ORDER BY total_recuperados_con_neumonia DESC;
@@ -103,7 +131,7 @@ SELECT
     COUNT(*) AS total_casos_con_neumonia
 FROM dbo.datoscovid
 WHERE CLASIFICACION_FINAL = 3  -- Casos confirmados
-AND NEUMONIA = 1              -- Pacientes con neumonía
+AND NEUMONIA = 1              -- Pacientes con neumonÃ­a
 GROUP BY ENTIDAD_NAC
 ORDER BY total_casos_con_neumonia DESC;
 ------------------------------------------------------------
