@@ -1,0 +1,15 @@
+-- Fragmentacion estados SUR SURESTE / MYSQL
+INSERT INTO OPENQUERY(NODO_MYSQL, 'SELECT * FROM covidhistorico.datoscovid')
+SELECT * FROM datoscovid WHERE entidad_res IN (30, 20, 07, 27, 04, 31, 23, 28) ;
+
+---------------------------------------------------------------------------------
+-- Fragmentacion estados norte
+SELECT * INTO datoscovid_norte
+FROM covidHistorico.dbo.datoscovid
+WHERE ENTIDAD_RES IN (02,03, 05, 08, 10, 26, 25, 19);
+
+---------------------------------------------------------------------------------
+-- Fragmenatcion estados centro norte
+SELECT * INTO datoscovid_centro_norte
+FROM covidHistorico.dbo.datoscovid
+WHERE ENTIDAD_RES IN (01, 32, 24, 11, 22, 14, 18, 06);
