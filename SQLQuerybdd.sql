@@ -1,25 +1,52 @@
------Fracmentacion de nodos por entidades---------------------------------------------------------
---Nodo A "Norte" Sql Server
-
-
-
---Nodo B "Centro_Norte" Sql Server
-
-
-
---Nodo C "Centro_Sur" Sql Server
-
-Use covidHistorico;
+use covidHistorico;
 go
---Traspasar y dividir las tablas
-SELECT * INTO datoscovid_centro_sur
-FROM covidHistorico.dbo.datoscovid
-WHERE ENTIDAD_RES IN (09,15,17,21,29,13,16,12);
---Visualizar la fragmentacion
-SELECT * FROM datoscovid_centro_sur
-    
---Nodo D "Sur" MySQL
 
+
+-----Consulta 1---------------------------------------------------------
+--Top 5 entidades con más casos confirmados por cada año.
+
+WITH casos_por_entidad AS (
+    SELECT 
+        YEAR(FECHA_INGRESO) AS anio,
+        ENTIDAD_NAC,
+        COUNT(*) AS total_casos
+    FROM dbo.datoscovid
+    WHERE CLASIFICACION_FINAL = 3 -- Solo casos confirmados
+    GROUP BY YEAR(FECHA_INGRESO), ENTIDAD_NAC
+)
+SELECT anio, ENTIDAD_NAC, total_casos
+FROM (
+    SELECT 
+        anio, 
+        ENTIDAD_NAC, 
+        total_casos,
+        RANK() OVER (PARTITION BY anio ORDER BY total_casos DESC) AS ranking
+    FROM casos_por_entidad
+) t
+WHERE ranking <= 5
+ORDER BY anio, ranking;
+
+------Consulta 2---------------------------------------------------------
+--Municipio con más casos confirmados recuperados por estado y por año.
+
+SELECT 
+    YEAR(FECHA_INGRESO) AS anio,
+    ENTIDAD_NAC,
+    MUNICIPIO_RES,
+    COUNT(*) AS total_confirmados
+FROM dbo.datoscovid
+WHERE CLASIFICACION_FINAL = 3  -- Solo casos confirmados
+GROUP BY YEAR(FECHA_INGRESO), ENTIDAD_NAC, MUNICIPIO_RES
+HAVING COUNT(*) = (
+    SELECT MAX(casos)
+    FROM (
+        SELECT COUNT(*) AS casos
+        FROM dbo.datoscovid
+        WHERE CLASIFICACION_FINAL = 3
+        GROUP BY YEAR(FECHA_INGRESO), ENTIDAD_NAC, MUNICIPIO_RES
+    ) AS max_casos
+)
+ORDER BY anio, ENTIDAD_NAC;
 
 --------Consulta 3--------------------------------------------------------
 --Porcentaje de casos confirmados de diabetes, obesidad e hipertensión.
@@ -42,43 +69,15 @@ FROM dbo.datoscovid;
 -------Consulta 4---------------------------------------------------
 --Municipios que no tengan casos confirmados de hipertensión, obesidad, diabetes y tabaquismo.
 
-SELECT DISTINCT MUNICIPIO_RES INTO #temporal_municipios
-FROM (
-    SELECT MUNICIPIO_RES 
-    FROM [YUVIA\ABIGAIL].[covidHistorico].[dbo].[datoscovid_norte]
-    WHERE CLASIFICACION_FINAL = 3 AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
-    UNION
-    SELECT MUNICIPIO_RES 
-    FROM [PC-MONZEE\SQLEXPRESS03].[covidHistorico].[dbo].[datoscovid_centro_norte]
-    WHERE CLASIFICACION_FINAL = 3 AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
-    UNION    
-    SELECT MUNICIPIO_RES 
-    FROM covidHistorico.dbo.[datoscovid_centro_sur]
-    WHERE CLASIFICACION_FINAL = 3 AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)    
-    UNION    
-    SELECT MUNICIPIO_RES 
-    FROM OPENQUERY([MYSQLYUVIA], '
-        SELECT MUNICIPIO_RES 
-        FROM datoscovid 
-        WHERE CLASIFICACION_FINAL = 3
-        AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
-    ')
-) AS datos;
-
 SELECT DISTINCT MUNICIPIO_RES
-FROM (
-    SELECT MUNICIPIO_RES FROM [YUVIA\ABIGAIL].[covidHistorico].[dbo].[datoscovid_norte]
-    UNION
-    SELECT MUNICIPIO_RES FROM [PC-MONZEE\SQLEXPRESS03].[covidHistorico].[dbo].[datoscovid_centro_norte]
-    UNION
-    SELECT MUNICIPIO_RES FROM covidHistorico.dbo.[datoscovid_centro_sur]
-    UNION
-    SELECT MUNICIPIO_RES FROM OPENQUERY([MYSQLYUVIA], 'SELECT MUNICIPIO_RES FROM datoscovid')
-) AS todos_municipios
-WHERE MUNICIPIO_RES NOT IN (SELECT MUNICIPIO_RES FROM #temporal_municipios)
+FROM dbo.datoscovid
+WHERE MUNICIPIO_RES NOT IN (
+    SELECT DISTINCT MUNICIPIO_RES
+    FROM dbo.datoscovid
+    WHERE CLASIFICACION_FINAL = 3  -- Casos confirmados
+    AND (DIABETES = 1 OR OBESIDAD = 1 OR TABAQUISMO = 1)
+)
 ORDER BY MUNICIPIO_RES;
-
-DROP TABLE #temporal_municipios;
 
 -------Consulta 5-----------------------------------------------------
 --Estados con más casos recuperados con neumonía.
@@ -108,6 +107,11 @@ AND NEUMONIA = 1              -- Pacientes con neumonía
 GROUP BY ENTIDAD_NAC
 ORDER BY total_casos_con_neumonia DESC;
 ------------------------------------------------------------
+
+SELECT DISTINCT ENTIDAD_NAC
+FROM dbo.datoscovid
+WHERE CLASIFICACION_FINAL = 3  
+AND NEUMONIA = 1;
 
 SELECT DISTINCT ENTIDAD_NAC
 FROM dbo.datoscovid
