@@ -1,52 +1,25 @@
-use covidHistorico;
+-----Fracmentacion de nodos por entidades---------------------------------------------------------
+--Nodo A "Norte" Sql Server
+
+
+
+--Nodo B "Centro_Norte" Sql Server
+
+
+
+--Nodo C "Centro_Sur" Sql Server
+
+Use covidHistorico;
 go
+--Traspasar y dividir las tablas
+SELECT * INTO datoscovid_centro_sur
+FROM covidHistorico.dbo.datoscovid
+WHERE ENTIDAD_RES IN (09,15,17,21,29,13,16,12);
+--Visualizar la fragmentacion
+SELECT * FROM datoscovid_centro_sur
+    
+--Nodo D "Sur" MySQL
 
-
------Consulta 1---------------------------------------------------------
---Top 5 entidades con más casos confirmados por cada año.
-
-WITH casos_por_entidad AS (
-    SELECT 
-        YEAR(FECHA_INGRESO) AS anio,
-        ENTIDAD_NAC,
-        COUNT(*) AS total_casos
-    FROM dbo.datoscovid
-    WHERE CLASIFICACION_FINAL = 3 -- Solo casos confirmados
-    GROUP BY YEAR(FECHA_INGRESO), ENTIDAD_NAC
-)
-SELECT anio, ENTIDAD_NAC, total_casos
-FROM (
-    SELECT 
-        anio, 
-        ENTIDAD_NAC, 
-        total_casos,
-        RANK() OVER (PARTITION BY anio ORDER BY total_casos DESC) AS ranking
-    FROM casos_por_entidad
-) t
-WHERE ranking <= 5
-ORDER BY anio, ranking;
-
-------Consulta 2---------------------------------------------------------
---Municipio con más casos confirmados recuperados por estado y por año.
-
-SELECT 
-    YEAR(FECHA_INGRESO) AS anio,
-    ENTIDAD_NAC,
-    MUNICIPIO_RES,
-    COUNT(*) AS total_confirmados
-FROM dbo.datoscovid
-WHERE CLASIFICACION_FINAL = 3  -- Solo casos confirmados
-GROUP BY YEAR(FECHA_INGRESO), ENTIDAD_NAC, MUNICIPIO_RES
-HAVING COUNT(*) = (
-    SELECT MAX(casos)
-    FROM (
-        SELECT COUNT(*) AS casos
-        FROM dbo.datoscovid
-        WHERE CLASIFICACION_FINAL = 3
-        GROUP BY YEAR(FECHA_INGRESO), ENTIDAD_NAC, MUNICIPIO_RES
-    ) AS max_casos
-)
-ORDER BY anio, ENTIDAD_NAC;
 
 --------Consulta 3--------------------------------------------------------
 --Porcentaje de casos confirmados de diabetes, obesidad e hipertensión.
